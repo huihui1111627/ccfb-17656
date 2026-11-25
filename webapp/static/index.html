@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>显存预估实验台 · memlab</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header>
+  <h1>显存预估实验台</h1>
+  <div class="sub">提交前预判: 这个配置能不能跑 · 峰值多少 · 最少几张卡</div>
+</header>
+
+<div class="layout">
+  <!-- 左侧配置面板 -->
+  <aside class="panel" id="controls">
+    <h2>训练配置</h2>
+
+    <label>模型
+      <select id="model"></select>
+    </label>
+    <div class="hint" id="model-desc"></div>
+
+    <div class="grid2">
+      <label>批大小
+        <input type="number" id="batch" value="8" min="1" max="1024">
+      </label>
+      <label>序列长度
+        <input type="number" id="seq" min="0" placeholder="默认">
+      </label>
+    </div>
+
+    <div class="grid2">
+      <label>精度
+        <select id="precision"></select>
+      </label>
+      <label>优化器
+        <select id="optimizer"></select>
+      </label>
+    </div>
+
+    <div class="grid2">
+      <label>并行方式
+        <select id="mode">
+          <option value="single">单卡</option>
+          <option value="dp">数据并行</option>
+          <option value="zero">ZeRO 分片</option>
+          <option value="pipeline">流水并行</option>
+        </select>
+      </label>
+      <label>卡数
+        <input type="number" id="world" value="1" min="1" max="16">
+      </label>
+    </div>
+
+    <label>卡型
+      <select id="gpu"></select>
+    </label>
+
+    <label>Checkpoint 层 (逗号分隔层名, 留空关闭)
+      <input type="text" id="checkpoint" placeholder="如 block1 或 conv2">
+    </label>
+
+    <button id="run">重新预估</button>
+
+    <div class="solver">
+      <h3>容量规划</h3>
+      <button id="btn-maxbatch" class="secondary">求最大批大小</button>
+      <button id="btn-mingpu" class="secondary">求最少卡数</button>
+      <div id="solver-out" class="solver-out"></div>
+    </div>
+
+    <div class="solver">
+      <h3>Checkpoint 分析</h3>
+      <button id="btn-ckpt" class="secondary">逐层成本/收益</button>
+      <div id="ckpt-out" class="solver-out"></div>
+    </div>
+  </aside>
+
+  <!-- 右侧主区 -->
+  <main class="main">
+    <!-- 结论卡片 -->
+    <div class="cards">
+      <div class="card" id="card-verdict">
+        <div class="card-label">能否运行</div>
+        <div class="card-value" id="verdict">—</div>
+      </div>
+      <div class="card">
+        <div class="card-label">峰值预留显存</div>
+        <div class="card-value" id="peak-reserved">—</div>
+      </div>
+      <div class="card">
+        <div class="card-label">峰值活跃张量</div>
+        <div class="card-value" id="peak-alloc">—</div>
+      </div>
+      <div class="card">
+        <div class="card-label">碎片/预留损耗</div>
+        <div class="card-value" id="peak-frag">—</div>
+      </div>
+      <div class="card">
+        <div class="card-label">峰值出现阶段</div>
+        <div class="card-value small" id="peak-phase">—</div>
+      </div>
+      <div class="card">
+        <div class="card-label">块复用次数</div>
+        <div class="card-value" id="reuse">—</div>
+      </div>
+    </div>
+
+    <!-- 时间线堆叠图 -->
+    <section class="chart-box">
+      <div class="chart-head">
+        <h2>一步训练显存时间线</h2>
+        <div class="legend" id="legend"></div>
+      </div>
+      <canvas id="chart" height="340"></canvas>
+      <div class="chart-foot">
+        <span id="hover-info">悬停查看每个时刻的构成</span>
+        <label class="toggle">
+          <input type="checkbox" id="show-reserved" checked>
+          显示预留量 (含碎片)
+        </label>
+      </div>
+    </section>
+
+    <!-- 峰值时刻 top tensors + 各卡 -->
+    <div class="two-col">
+      <section class="chart-box">
+        <h2>峰值时刻占用最大的张量</h2>
+        <table id="top-table">
+          <thead><tr><th>张量</th><th>类别</th><th>MiB</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+      <section class="chart-box">
+        <h2>各卡峰值 (并行)</h2>
+        <div id="per-gpu" class="per-gpu"></div>
+      </section>
+    </div>
+
+    <!-- 验证结果 -->
+    <section class="chart-box">
+      <div class="chart-head">
+        <h2>预估 vs 真跑 批量验证</h2>
+        <button id="btn-load-val" class="secondary">加载验证结果</button>
+      </div>
+      <div id="val-summary" class="val-summary"></div>
+      <div class="table-wrap">
+        <table id="val-table">
+          <thead><tr>
+            <th>模型</th><th>批</th><th>精度</th><th>优化器</th>
+            <th>并行</th><th>卡</th><th>ckpt</th>
+            <th>预估MiB</th><th>真跑MiB</th><th>误差</th><th>判定</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>
